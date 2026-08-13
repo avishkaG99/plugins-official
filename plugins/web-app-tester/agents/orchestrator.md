@@ -205,9 +205,20 @@ Target the comment to the entry artefact:
 
 If posting the starting comment fails, output a single warning line and continue — do not stop the run.
 
-**Leave this comment as posted — never edit it.** Later milestones post their own comments; see `providers/github.md` "Progress Comments" for the five and their bodies.
+**Post it at most once per run — check before posting.** A host may dispatch the orchestrator more than once for a single trigger, and each dispatch posting its own comment leaves the PR with duplicates. Look for an existing status comment first and reuse it:
 
-**Progress discipline (every phase):** a run routinely goes 60–120 seconds without visible output, which is indistinguishable from a hang. Post or update the relevant comment before any step expected to exceed a minute. A failed progress post is logged and ignored; it never aborts the run.
+```bash
+STATUS_ID=$(gh api "repos/${REPO}/issues/${ENTRY_ID}/comments" \
+  --jq '[.[] | select(.body | startswith("🤖 **Web app test"))] | last | .id // empty')
+```
+
+If `STATUS_ID` is non-empty, **do not post another comment** — adopt that id as the run's status comment and continue. Only post a new one when the query returns nothing.
+
+**This comment is the run's status display.** Keep its id as `STATUS_ID` and PATCH it at each state change — Resolving, Ready, Executing (every 5 cases), Reporting, Done — per `providers/github.md` "Progress Comments". Editing one comment keeps the thread readable; never post a second status comment.
+
+The final report and any proposed-cases comment are **separate** posts, not edits of this one.
+
+**Progress discipline (every phase):** a run routinely goes 60–120 seconds without visible output, which is indistinguishable from a hang. Update the status before any step expected to exceed a minute. A failed update is logged and ignored; it never aborts the run.
 
 ---
 

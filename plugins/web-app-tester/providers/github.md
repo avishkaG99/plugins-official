@@ -101,101 +101,49 @@ EOF
 
 ## Progress Comments
 
-A run regularly goes 60–120 seconds with no visible output — resolving the sheet, exploring selectors, and executing a long plan all happen silently. From the outside that is indistinguishable from a hung job.
+A run goes 60–120 seconds at a time with no visible output. From the outside that is indistinguishable from a hang, so the run must show where it is.
 
-**Each milestone is its own comment.** The starting comment stays exactly as posted — never edit it. Subsequent milestones post separate comments, so the PR thread reads as a chronological record of what the run established and when. Only the periodic *execution tally* edits itself in place, because it fires repeatedly and would otherwise flood the thread.
-
-### 1. Starting comment — post once, never edit
-
-Already covered above. It says the run has begun and nothing more.
-
-### 2. Test plan resolved — post after Phase 1
-
-Post as soon as the sheet is located and parsed, before any browser work. This is the comment that tells the author what will actually be tested.
+**One status comment, edited through the run.** The starting comment *is* the status comment — capture its id and PATCH it at every state change rather than posting again. Editing keeps the thread to two comments (status + final report) instead of six, and the reader watches one place.
 
 ```bash
-gh pr comment ${PR_NUMBER} --body "$(cat <<'EOF'
-🤖 **Test plan resolved**
-
-**Source:** `<TEST_SHEET_PATH>` (repository test case sheet)
-**Active cases:** <n>
-**Target:** <TEST_URL>
-<if WORKTREE_CORRECTED: "**Workspace:** re-pointed to the PR head (`<sha>`) — the prepared checkout was on the default branch.">
-
-Executing all <n> active cases now.
-EOF
-)"
+gh api --method PATCH "repos/${REPO}/issues/comments/${STATUS_ID}" \
+  -f body="<new body>" >/dev/null
 ```
 
-When no sheet was found and the plan was auto-generated or scraped, say so plainly here instead — that is the moment the author can still intervene.
+### The states
 
-### 3. Proposed cases — post only when coverage is missing
+Move through these in order, editing the same comment each time:
 
-Post when the PR adds user-facing behaviour no `Active` case covers. This is a **separate comment** from the plan and from the report, because it is the one that asks the author for a decision.
+| State | Body |
+|---|---|
+| **Starting** | `🤖 **Web app test in progress**` + the original wording |
+| **Resolving** | `⚙️ Resolving the test plan…` — after the worktree check, before Phase 1 finishes |
+| **Ready** | `📋 **Testing <n> cases** from \`<sheet>\` against <url>` — plan resolved, browser starting |
+| **Executing** | `▶️ **<k>/<n> cases** · ✅ <p> · ❌ <f> · ⚪ <b>` — refreshed every 5 cases |
+| **Reporting** | `📝 Composing the report…` |
+| **Done** | `✅ **Complete** — <p>/<n> passed. See the report below.` |
 
-**Ask a direct question and give a clickable answer.** GitHub comments cannot render a dropdown, but task-list checkboxes are interactive — a reader ticks one in the rendered comment without editing markdown. Use one checkbox per option and state plainly that ticking is the whole action:
+Include a trailing `_Updated <UTC time>._` on every state so a stalled run is visibly stalled — an unchanged timestamp is the signal.
 
-```bash
-gh pr comment ${PR_NUMBER} --body "$(cat <<'EOF'
-🤖 **New feature detected — add test cases?**
+Worked example at the Executing state:
 
-This PR adds **<feature>**, which no active case in `<sheet path>` covers.
-The suite currently holds **<n> active cases**; these would make it **<n+k>**.
-
-<one-line summary per proposed case, e.g.:>
-- `TC-053` — create a saved view (Happy)
-- `TC-054` — delete a saved view (Happy)
-
-<details>
-<summary>Show the exact rows that would be appended</summary>
-
-```csv
-<the full CSV rows>
 ```
-</details>
+🤖 **Web app test in progress**
 
----
+▶️ **25/52 cases** · ✅ 25 · ❌ 0 · ⚪ 0
 
-**Do you want these added to `<sheet path>` and committed to this PR?**
+**Plan:** `test-cases.csv` (52 active cases)
+**Target:** https://test-runner-git-feature-product-tags-….vercel.app
+**Workspace:** re-pointed to the PR head (`42d1dd7`)
 
-- [ ] ✅ **Yes** — append them, commit to this branch, then run all <n+k> cases
-- [ ] ❌ **No** — leave the sheet alone and test the existing <n> cases
-
-_Tick a box, or apply the `ai-dlc/pr/test-cases-approved` label — either works.
-Ignoring this is fine too: the next ordinary run tests the <n> existing cases._
-EOF
-)"
+_Updated 18:42:11 UTC._
 ```
 
-**Reading the answer.** On the next run, fetch this comment and check which box is ticked (`- [x]`). Treat the ticked "Yes" as approval, a ticked "No" as a decline, and neither ticked as no decision — which is the same as a decline for behaviour, but is reported differently (`no response` vs `declined`). If **both** are ticked, do not guess: post one line asking for a single choice and stop.
+The final report is a **separate** comment — the status comment is left at **Done** rather than being overwritten with it, so the run's trace and its result both remain readable.
 
-An edited CSV block in a human reply still wins over the agent's original rows.
+**Proposed cases** are also a separate comment, since they ask the reader for a decision and must not be overwritten by a later state.
 
-Post nothing when coverage is complete — silence is the correct signal there; the final report states that no gap was found.
-
-### 4. Execution tally — one comment, edited in place
-
-This is the exception to the one-comment-per-milestone rule. It fires every 5 cases or ~45 seconds, so it edits itself rather than posting repeatedly. Create it once when execution starts, capture its ID, then PATCH it:
-
-```bash
-TALLY_ID=$(gh pr comment ${PR_NUMBER} --body "🤖 **Executing** — 0/<n> cases" 2>/dev/null \
-  && gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" --jq 'last | .id')
-
-gh api --method PATCH "repos/${REPO}/issues/comments/${TALLY_ID}" \
-  -f body="🤖 **Executing** — <k>/<n> cases · <p> passed · <f> failed · <b> blocked
-
-_Updated <UTC timestamp>._" >/dev/null
-```
-
-When the run finishes, leave the tally at its final state; the report comment follows it.
-
-### 5. Final report — post once
-
-The full test execution report, per `styles/report-template.md`.
-
----
-
-If any progress comment fails to post, log one warning line and continue. Status reporting must never abort a test run.
+If any edit fails, log one warning and continue. Status reporting never aborts a run.
 
 
 ## Posting the "No URL Found" Comment
