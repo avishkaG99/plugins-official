@@ -205,9 +205,15 @@ Target the comment to the entry artefact:
 
 If posting the starting comment fails, output a single warning line and continue — do not stop the run.
 
-**Capture the comment's ID as `STATUS_COMMENT_ID`** and keep it in scope for every phase. The run updates that one comment as it progresses rather than posting new ones — see `providers/github.md` "Progress Heartbeats" for the exact calls and the points at which to fire them.
+**Leave this comment as posted — never edit it.** It records that the run started; later milestones post their own comments so the thread reads chronologically. See `providers/github.md` "Progress Comments" for all five and their exact bodies:
 
-**Heartbeat discipline (applies to every phase):** a run routinely goes 60–120 seconds without visible output, which is indistinguishable from a hang. Before starting any step you expect to exceed roughly a minute — browser install, exploration, the main test script, report composition — update the status comment first, naming what is about to happen and whether it will report intermediate progress. Update again when it finishes. A failed heartbeat is logged and ignored; it never aborts the run.
+1. Starting comment (this one)
+2. **Test plan resolved** — after Phase 1: sheet path, active-case count, target URL, and whether the workspace had to be corrected
+3. **Proposed cases** — only when coverage is missing
+4. **Execution tally** — created once when execution begins, then edited in place every ~10 cases or ~90 seconds (the one exception to separate comments, since it repeats)
+5. **Final report**
+
+**Progress discipline (every phase):** a run routinely goes 60–120 seconds without visible output, which is indistinguishable from a hang. Post or update the relevant comment before starting any step expected to exceed roughly a minute — browser install, exploration, the main test script, report composition. A failed progress post is logged and ignored; it never aborts the run.
 
 ---
 
@@ -252,6 +258,13 @@ Establish coverage, propose, and stop. Do **not** open a browser and do **not** 
 4. Stop. Report `PLAN_SOURCE`, the sheet path, the active-case count, and the proposed IDs. Emit no verdict — nothing was tested.
 
 If no uncovered behaviour is found, post that finding plainly and stop; there is nothing to approve.
+
+**Approval is optional, and declining costs nothing.** These are two independent triggers, not a blocking gate:
+
+- **Approve** → the `--apply-cases` run appends the rows, commits them, and tests the enlarged suite.
+- **Do nothing, or decline** → the ordinary label runs whenever you choose, tests the sheet exactly as it stands, and posts a normal report. The proposal comment simply remains on the PR as an unactioned suggestion.
+
+Never treat a missing approval as a failure, never re-post the proposal to chase a decision, and never block a plain run because a proposal is outstanding. A plain run whose sheet still lacks the proposed cases notes that in the report — it does not refuse to run or mark the PR incomplete.
 
 The approval instruction in the comment must name the exact mechanism the repo uses. Default wording:
 

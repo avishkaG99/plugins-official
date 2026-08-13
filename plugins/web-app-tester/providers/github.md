@@ -99,62 +99,66 @@ EOF
 )"
 ```
 
-## Progress Heartbeats
+## Progress Comments
 
-A run regularly goes 60–120 seconds with no visible output — resolving the sheet, exploring selectors, and executing a long plan all happen silently. From the outside that is indistinguishable from a hung job, so the run must say where it is.
+A run regularly goes 60–120 seconds with no visible output — resolving the sheet, exploring selectors, and executing a long plan all happen silently. From the outside that is indistinguishable from a hung job.
 
-**Capture the starting comment's ID** so later updates edit it in place instead of posting a new comment each time. One comment that changes is readable; six comments are noise.
+**Each milestone is its own comment.** The starting comment stays exactly as posted — never edit it. Subsequent milestones post separate comments, so the PR thread reads as a chronological record of what the run established and when. Only the periodic *execution tally* edits itself in place, because it fires repeatedly and would otherwise flood the thread.
 
-```bash
-STATUS_COMMENT_ID=$(gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" \
-  --jq 'map(select(.user.login=="github-actions[bot]" or (.body|startswith("🤖 **Web app test in progress**")))) | last | .id')
-```
+### 1. Starting comment — post once, never edit
 
-**Update it** at each phase boundary, and whenever a single step is expected to exceed ~60 seconds:
+Already covered above. It says the run has begun and nothing more.
 
-```bash
-gh api --method PATCH "repos/${REPO}/issues/comments/${STATUS_COMMENT_ID}" \
-  -f body="$(cat <<'EOF'
-🤖 **Web app test in progress**
+### 2. Test plan resolved — post after Phase 1
 
-**Now:** <current activity>
-**Done:** <phases completed>
-**Next:** <what follows>
-
-_Updated <UTC timestamp>. The full report replaces this comment when the run completes._
-EOF
-)" >/dev/null
-```
-
-Post an update at each of these points — they bracket the longest silences:
-
-| Point | `Now:` reads |
-|---|---|
-| Worktree corrected (Phase 0.5) | `Re-pointed the workspace at the PR head (<sha>)` |
-| Sheet resolved (Phase 1) | `Loaded <n> active cases from <sheet path>` |
-| Chromium ready (Phase 2 step 1) | `Browser ready — exploring the app for stable selectors` |
-| Execution starting | `Executing <n> test cases against <url>` |
-| Every ~10 cases, or 90s, whichever first | `Executed <k>/<n> cases — <p> passed, <f> failed, <b> blocked` |
-| Report composing (Phase 3) | `Composing the report` |
-
-The periodic execution update is the important one: a 52-case plan spends most of its wall clock inside a single script invocation. When the plan is long enough that intermediate progress cannot be reported from inside the script, say so explicitly in the "Executing" update — `this step runs to completion before the next update` — so a long silence is expected rather than alarming.
-
-If any heartbeat call fails, continue the run — a failed status update must never abort a test run. Never post heartbeat content as a new comment when `STATUS_COMMENT_ID` is known.
-
-**Verify mode (`MODE=verify`) — post the verification variant on the issue:**
+Post as soon as the sheet is located and parsed, before any browser work. This is the comment that tells the author what will actually be tested.
 
 ```bash
-gh issue comment ${ISSUE_NUMBER} --body "$(cat <<'EOF'
-🤖 **Bug verification in progress**
+gh pr comment ${PR_NUMBER} --body "$(cat <<'EOF'
+🤖 **Test plan resolved**
 
-I'm replaying the repro steps against the deployed environment and running a decisive check against the expected result. A STILL REPRODUCIBLE / NOT REPRODUCIBLE / INCONCLUSIVE verdict will be posted here when complete — this may take a few minutes.
+**Source:** `<TEST_SHEET_PATH>` (repository test case sheet)
+**Active cases:** <n>
+**Target:** <TEST_URL>
+<if WORKTREE_CORRECTED: "**Workspace:** re-pointed to the PR head (`<sha>`) — the prepared checkout was on the default branch.">
+
+Executing all <n> active cases now.
 EOF
 )"
 ```
 
-If posting fails, output a single warning line and continue — do not stop the run.
+When no sheet was found and the plan was auto-generated or scraped, say so plainly here instead — that is the moment the author can still intervene.
+
+### 3. Proposed cases — post only when coverage is missing
+
+Post when the PR adds user-facing behaviour no `Active` case covers. This is a **separate comment** from the plan and from the report, because it is the one that asks the author for a decision. See "Coverage-First Flow" in `agents/orchestrator.md` for what happens next.
+
+Post nothing when coverage is complete — silence is the correct signal there; the final report states that no gap was found.
+
+### 4. Execution tally — one comment, edited in place
+
+This is the exception to the one-comment-per-milestone rule. It fires every ~10 cases or ~90 seconds, so it edits itself rather than posting repeatedly. Create it once when execution starts, capture its ID, then PATCH it:
+
+```bash
+TALLY_ID=$(gh pr comment ${PR_NUMBER} --body "🤖 **Executing** — 0/<n> cases" 2>/dev/null \
+  && gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" --jq 'last | .id')
+
+gh api --method PATCH "repos/${REPO}/issues/comments/${TALLY_ID}" \
+  -f body="🤖 **Executing** — <k>/<n> cases · <p> passed · <f> failed · <b> blocked
+
+_Updated <UTC timestamp>._" >/dev/null
+```
+
+When the run finishes, leave the tally at its final state; the report comment follows it.
+
+### 5. Final report — post once
+
+The full test execution report, per `styles/report-template.md`.
 
 ---
+
+If any progress comment fails to post, log one warning line and continue. Status reporting must never abort a test run.
+
 
 ## Posting the "No URL Found" Comment
 
