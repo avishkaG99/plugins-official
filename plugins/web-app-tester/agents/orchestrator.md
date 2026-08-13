@@ -203,6 +203,33 @@ If posting the starting comment fails, output a single warning line and continue
 
 ---
 
+## Phase 0.5 — Verify the Worktree Matches the Entry (`pr` entry only)
+
+**Run this before Phase 1 reads any repository file.** Some hosts prepare the workspace at the repository's *default branch* rather than the PR's head commit. When that happens every file the run reads — the test case sheet, the feature source, the config — comes from the wrong commit, while the browser is pointed at the PR's deployed preview. The run then reports results for code the PR does not contain, which looks like a passing test rather than the mismatch it is.
+
+Check the checked-out commit against the PR's head:
+
+```bash
+HEAD_SHA=$(git rev-parse HEAD)
+PR_SHA=$(gh pr view ${ENTRY_ID} --repo ${REPO} --json headRefOid --jq '.headRefOid')
+echo "worktree=${HEAD_SHA} pr_head=${PR_SHA}"
+```
+
+**If they match**, continue to Phase 1 unchanged.
+
+**If they differ**, correct the worktree before reading anything. The PR head is always fetchable via the `refs/pull/<n>/head` ref, which works for same-repo and fork PRs alike:
+
+```bash
+git fetch --no-tags origin "refs/pull/${ENTRY_ID}/head" && git checkout -q FETCH_HEAD
+git rev-parse HEAD   # must now equal PR_SHA
+```
+
+Record `WORKTREE_CORRECTED=true` and the two SHAs; Phase 3 notes this in the report, because a run whose workspace had to be corrected is materially different from one that started correct.
+
+**If the fetch or checkout fails**, do not proceed with the wrong commit. Post the "no testable URL"-style failure comment naming the mismatch — `Workspace is at <sha> but PR #<n> head is <sha>; could not correct` — and stop. Testing the wrong commit silently is worse than not testing.
+
+---
+
 ## Phase 1 — Gather Test Context
 
 Read and follow `skills/gather-test-context/SKILL.md`, passing in `MODE`, `IS_PRODUCTION`, and the resolved config variables (`TEST_URL_SOURCE`, candidate URL, `MUTATIONS_ALLOWED`, `ROLE`, `STORAGE_STATE`, `AUTH_SETUP_COMMAND`, `TEST_SHEET`).

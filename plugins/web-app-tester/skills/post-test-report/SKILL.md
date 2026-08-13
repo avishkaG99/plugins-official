@@ -24,6 +24,7 @@ This skill is invoked by the **orchestrator** agent. It is not a standalone slas
 | `TEST_SHEET_PATH` | gather-test-context | Path to the repository test case sheet, when one was used — else unset |
 | `TEST_SHEET_CASES` | gather-test-context | Count of `Active` cases selected from the sheet — else unset |
 | `CHANGED_FILES` | gather-test-context | Paths the PR adds or modifies — the basis for deciding what behaviour is new |
+| `WORKTREE_CORRECTED` | orchestrator | `true` when the workspace had to be re-pointed at the PR head before reading files — else unset |
 | `PLATFORM` | orchestrator | `GitHub` or `AzureDevOps` |
 | `RUN_START_TIME` | run-playwright-session | ISO 8601 UTC timestamp of run start |
 | `RUN_DURATION_S` | run-playwright-session | Total run duration in seconds (one decimal place) |
@@ -224,6 +225,8 @@ None — the changes in this PR are already covered by the active sheet.
 ```
 
 ### 2g. Notes (conditional)
+
+**When `WORKTREE_CORRECTED` is `true`, always emit a Notes entry** stating that the workspace was prepared at the default branch and had to be re-pointed at the PR head before any file was read, naming both SHAs. Readers otherwise have no way to know the run nearly tested the wrong commit.
 
 Include a `## Notes` block only for meaningful operational caveats (e.g. Vercel SSO forcing a local-stack fallback, known flaky external dependency). Skip entirely if there is nothing material to note.
 
