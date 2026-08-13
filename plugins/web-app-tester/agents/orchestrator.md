@@ -57,7 +57,7 @@ Between the gates, execution is identical to autonomous mode.
 The invocation takes one of these forms:
 
 ```text
-/test-web-app [pr <n> | issue <n> | wi <id>] [--env <name>] [--url <url>] [--role <role>] [--interactive]
+/test-web-app [pr <n> | issue <n> | wi <id>] [--env <name>] [--url <url>] [--role <role>] [--interactive] [--propose-only] [--apply-cases]
 /verify-bug <wi <id> | issue <n>> [--env <name>] [--url <url>] [--role <role>] [--interactive]
 ```
 
@@ -70,6 +70,10 @@ Parse the arguments:
 5. **`ARG_URL`** — value of `--url`, if given.
 6. **`ARG_ROLE`** — value of `--role`, if given.
 7. **`INTERACTIVE`** — `true` when `--interactive` is given, or when the host is an interactive Claude Code session and the runner is not the Xianix executor; `false` otherwise.
+8. **`PROPOSE_ONLY`** — `true` when `--propose-only` is given. Detect uncovered behaviour and post proposed cases for review, then stop **without running the browser**. See "Coverage-First Flow".
+9. **`APPLY_CASES`** — `true` when `--apply-cases` is given. Append the approved cases to the sheet, commit them to the PR head branch, then run the full suite including the new rows. See "Coverage-First Flow".
+
+`--propose-only` and `--apply-cases` are mutually exclusive; if both are given, stop with `Error: --propose-only and --apply-cases cannot be combined.`
 
 **Determine `IS_PRODUCTION`**:
 
@@ -227,6 +231,58 @@ git rev-parse HEAD   # must now equal PR_SHA
 Record `WORKTREE_CORRECTED=true` and the two SHAs; Phase 3 notes this in the report, because a run whose workspace had to be corrected is materially different from one that started correct.
 
 **If the fetch or checkout fails**, do not proceed with the wrong commit. Post the "no testable URL"-style failure comment naming the mismatch — `Workspace is at <sha> but PR #<n> head is <sha>; could not correct` — and stop. Testing the wrong commit silently is worse than not testing.
+
+---
+
+## Coverage-First Flow (`--propose-only` / `--apply-cases`)
+
+By default a run tests the sheet as it stands and proposes uncovered cases at the end, leaving the sheet untouched. The coverage-first flow instead settles coverage **before** testing, so the full suite that runs already includes the PR's new behaviour. It is two runs with a human decision between them.
+
+### Run 1 — `--propose-only`
+
+Establish coverage, propose, and stop. Do **not** open a browser and do **not** execute any test case; this run exists to produce a reviewable list cheaply.
+
+1. Complete Phase 0.5 (worktree check) and Phase 1 up to sheet resolution — enough to know the sheet's contents and the next unused ID.
+2. Derive uncovered behaviour from `CHANGED_FILES` exactly as `skills/post-test-report/SKILL.md` §2f describes, **except** that you may not confirm behaviour in a running application — no browser runs in this mode. Base proposals on the changed files and the sheet alone, and say so.
+3. Post one comment titled `## 🤖 Proposed Test Cases — awaiting approval` containing: what the PR adds, why existing coverage is insufficient, the ready-to-paste CSV rows, and an explicit instruction for how to approve.
+4. Stop. Report `PLAN_SOURCE`, the sheet path, the active-case count, and the proposed IDs. Emit no verdict — nothing was tested.
+
+If no uncovered behaviour is found, post that finding plainly and stop; there is nothing to approve.
+
+The approval instruction in the comment must name the exact mechanism the repo uses. Default wording:
+
+```
+To approve: apply the `ai-dlc/pr/test-cases-approved` label to this PR.
+The next run will append these rows to <sheet path>, commit them to this
+branch, and execute the full suite including them.
+
+To reject or amend: edit the rows in a reply comment before applying the
+label — the run reads the most recent proposal comment.
+```
+
+### Run 2 — `--apply-cases`
+
+Apply the approved rows, then test everything.
+
+1. Complete Phase 0.5 so the worktree is at the PR head — the commit must land on the PR's branch, not the default branch.
+2. **Locate the approved rows.** Read the most recent `## 🤖 Proposed Test Cases` comment on the PR. If a later human reply contains an edited CSV block, that reply wins — the human's version is authoritative over the agent's original.
+3. **Validate every row before writing.** Each must have all sheet columns, an ID that is unused and continues the sequence, `Status=Active`, and `Added In=PR#<n>`. Reject the batch and stop if any row is malformed, duplicates an existing ID, or changes an existing row — appending is the only permitted edit.
+4. **Append and commit** to the PR head branch:
+
+   ```bash
+   git checkout -q "${PR_HEAD_BRANCH}"
+   # append validated rows to the sheet, preserving its exact CSV dialect and trailing newline
+   git add "${TEST_SHEET_PATH}"
+   git commit -m "test: add cases for <feature> (PR #<n>)"
+   git push origin "${PR_HEAD_BRANCH}"
+   ```
+
+   Never rewrite, reorder, or renumber existing rows. Never force-push. If the push is rejected because the branch moved, re-fetch, re-apply the append on top, and retry once; if it still fails, stop and report rather than forcing.
+5. **Re-read the sheet from disk** after the commit, so the plan reflects the appended rows.
+6. **Run the full suite** — every `Active` case including the new ones — through Phases 1–3 as normal.
+7. Phase 3 reports `CASES_APPLIED` (the IDs committed) and the commit SHA in Notes, so the report states plainly that the sheet grew during this run.
+
+**This is the one circumstance in which the plugin writes to the repository.** It requires an explicit `--apply-cases` invocation; without that flag the never-modify rule in `skills/post-test-report/SKILL.md` applies unchanged. The token must have write access to the PR branch — if the push fails with a permissions error, report that specifically rather than silently continuing to the test run, since the suite would then omit the approved cases.
 
 ---
 

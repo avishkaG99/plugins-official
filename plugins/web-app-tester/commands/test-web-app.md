@@ -1,6 +1,6 @@
 ---
 name: test-web-app
-description: Verify web app behaviour for a GitHub PR/Issue or Azure DevOps PR/Bug using the Webwright workflow (Python/Playwright, headless Chromium). Resolves the testable URL from --url/--env arguments, .web-app-tester.json, or comments; runs authenticated via a configured storage state; runs (or auto-generates) a structured test plan; and posts a step-by-step test execution report. Usage: /test-web-app [pr <n> | issue <n> | wi <id>] [--env <name>] [--url <url>] [--role <role>] [--interactive]
+description: Verify web app behaviour for a GitHub PR/Issue or Azure DevOps PR/Bug using the Webwright workflow (Python/Playwright, headless Chromium). Resolves the testable URL from --url/--env arguments, .web-app-tester.json, or comments; runs authenticated via a configured storage state; runs (or auto-generates) a structured test plan; and posts a step-by-step test execution report. Usage: /test-web-app [pr <n> | issue <n> | wi <id>] [--env <name>] [--url <url>] [--role <role>] [--interactive] [--propose-only] [--apply-cases]
 argument-hint: [pr <n> | issue <n> | wi <id>] [--env <name>] [--url <url>] [--role <role>] [--interactive]
 ---
 

@@ -25,6 +25,7 @@ This skill is invoked by the **orchestrator** agent. It is not a standalone slas
 | `TEST_SHEET_CASES` | gather-test-context | Count of `Active` cases selected from the sheet — else unset |
 | `CHANGED_FILES` | gather-test-context | Paths the PR adds or modifies — the basis for deciding what behaviour is new |
 | `WORKTREE_CORRECTED` | orchestrator | `true` when the workspace had to be re-pointed at the PR head before reading files — else unset |
+| `CASES_APPLIED` | orchestrator | `--apply-cases` runs only: the case IDs appended to the sheet and the commit SHA — else unset |
 | `PLATFORM` | orchestrator | `GitHub` or `AzureDevOps` |
 | `RUN_START_TIME` | run-playwright-session | ISO 8601 UTC timestamp of run start |
 | `RUN_DURATION_S` | run-playwright-session | Total run duration in seconds (one decimal place) |
@@ -214,7 +215,7 @@ TC-054,Notifications,Empty inbox shows a message,Negative,"1. Navigate to /notif
 Append these to `<TEST_SHEET_PATH>` if they look right.
 ```
 
-**Never modify the sheet, commit, push, or create a branch.** Propose only — a human appends approved rows. This section is the sole output of coverage analysis.
+**Never modify the sheet, commit, push, or create a branch.** Propose only — a human appends approved rows, or approves an `--apply-cases` run that appends them. This section is the sole output of coverage analysis in a default run.
 
 If the PR introduces no uncovered user-facing behaviour, state that in one line instead of emitting an empty block:
 
@@ -225,6 +226,8 @@ None — the changes in this PR are already covered by the active sheet.
 ```
 
 ### 2g. Notes (conditional)
+
+**When `CASES_APPLIED` is set, always emit a Notes entry** naming the appended case IDs, the sheet path, and the commit SHA — the suite that ran is larger than the sheet on the base branch, and the report must say so.
 
 **When `WORKTREE_CORRECTED` is `true`, always emit a Notes entry** stating that the workspace was prepared at the default branch and had to be re-pointed at the PR head before any file was read, naming both SHAs. Readers otherwise have no way to know the run nearly tested the wrong commit.
 
@@ -253,7 +256,7 @@ Never include the model name or ID in the report.
 6. **Never include secrets.** Keep `[REDACTED]` values redacted. If you spot a credential-like value that was not redacted upstream, redact it here before posting.
 7. **Sheet-sourced runs are 1:1 with the sheet.** When `TEST_SHEET_PATH` is set, every `Active` case must appear exactly once in the results table — executed, or listed with an explicit reason. Never silently drop a case, and never merge two cases into one row.
 8. **Preserve case IDs and titles verbatim** from the sheet, so results stay auditable against it.
-9. **Never modify the repository** — no edits to the sheet, no commits, no pushes. Proposals are comment text only.
+9. **Never modify the repository** — no edits to the sheet, no commits, no pushes. Proposals are comment text only. **Sole exception:** an `--apply-cases` run, where the orchestrator commits approved rows before this phase runs; see "Coverage-First Flow" in `agents/orchestrator.md`. This skill still never writes — the commit happens upstream of it.
 
 Store as `REPORT_BODY`.
 
