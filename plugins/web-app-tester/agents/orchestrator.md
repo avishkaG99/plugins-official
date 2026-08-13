@@ -189,40 +189,38 @@ Store `PLATFORM` and pass it through to every phase.
 
 ## Post a Starting Comment
 
-Immediately after platform detection — before installing Playwright, launching the browser, or fetching the entry artefact in Phase 1 — post a comment on the entry artefact so the author knows the run has started. **Browser installation and execution can take several minutes**; the starting comment closes the silence gap.
+**Do this immediately after platform detection** — before installing Playwright, launching a browser, or fetching the entry in Phase 1. Browser install and execution take minutes; this comment closes the silence gap and becomes the run's status display for everything that follows.
 
-Use the platform-appropriate method and mode-appropriate wording:
+Three steps, in this order:
 
-- **GitHub:** see `providers/github.md` — Posting the "Test in Progress" comment section (`MODE=verify`: use the "Bug verification in progress" variant)
-- **Azure DevOps:** see `providers/azure-devops.md` — Posting the Starting Comment section (`MODE=verify`: use the "Bug verification in progress" variant)
-- **Unknown platform:** skip — no API available
-
-In verify mode the starting comment is always posted **on the bug itself** (the work item or issue).
-
-Target the comment to the entry artefact:
-
-- `ENTRY_TYPE == pr` → comment on the PR (`ENTRY_ID`)
-- `ENTRY_TYPE == issue` → comment on the GitHub issue (`ENTRY_ID`)
-- `ENTRY_TYPE == wi` → comment on the Azure DevOps work item (`ENTRY_ID`)
-
-If posting the starting comment fails, output a single warning line and continue — do not stop the run.
-
-**Post it at most once per run — check before posting.** A host may dispatch the orchestrator more than once for a single trigger, and each dispatch posting its own comment leaves the PR with duplicates. Look for an existing status comment first and reuse it:
+**1. Look for an existing status comment.** A host may dispatch the orchestrator twice for one trigger; without this check each dispatch posts its own comment.
 
 ```bash
 STATUS_ID=$(gh api "repos/${REPO}/issues/${ENTRY_ID}/comments" \
   --jq '[.[] | select(.body | startswith("🤖 **Web app test"))] | last | .id // empty')
 ```
 
-If `STATUS_ID` is non-empty, **do not post another comment** — adopt that id as the run's status comment and continue. Only post a new one when the query returns nothing.
+**2a. `STATUS_ID` is empty → post it now.** This is the normal case on a first run. Use the body in `providers/github.md` → "Posting the 'Test in Progress' Comment" (`MODE=verify`: the "Bug verification in progress" variant), then capture the new comment's id as `STATUS_ID`:
 
-**This comment is the run's status display.** Keep its id as `STATUS_ID` and PATCH it at each state change — Resolving, Ready, Executing (every 5 cases), Reporting, Done — per `providers/github.md` "Progress Comments".
+```bash
+gh pr comment ${ENTRY_ID} --body "<body from providers/github.md>"
+STATUS_ID=$(gh api "repos/${REPO}/issues/${ENTRY_ID}/comments" \
+  --jq '[.[] | select(.body | startswith("🤖 **Web app test"))] | last | .id')
+```
 
-**Never change its first line.** The heading `🤖 **Web app test in progress**` stays byte-identical across every state; the state goes on the second line. That heading is how the comment is found again, so editing it strands the comment and the next update posts a duplicate. Never post a second status comment.
+**2b. `STATUS_ID` is non-empty → adopt it.** Another dispatch already posted one. Do not post a second; continue with that id.
 
-The final report and any proposed-cases comment are **separate** posts, not edits of this one.
+**3. Carry `STATUS_ID` through every phase.** It is PATCHed at each state change — Resolving, Ready, Executing (after every case), Reporting, Done — per `providers/github.md` "Progress Comments".
 
-**Progress discipline (every phase):** a run routinely goes 60–120 seconds without visible output, which is indistinguishable from a hang. Update the status before any step expected to exceed a minute. A failed update is logged and ignored; it never aborts the run.
+Target the comment at the entry: `pr` → the PR, `issue` → the GitHub issue, `wi` → the Azure DevOps work item. In verify mode it always goes on the bug itself. On an unknown platform, skip — no API is available.
+
+**Never change its first line.** The heading `🤖 **Web app test in progress**` stays byte-identical across every state; the state goes on the second line. Editing the heading strands the comment, and the next update posts a duplicate instead of editing.
+
+The final report and any proposed-cases comment are **separate** posts, never edits of this one.
+
+**If posting fails**, output one warning line and continue — a missing status comment never stops a test run.
+
+**Progress discipline (every phase):** a run routinely goes 60–120 seconds without visible output, which is indistinguishable from a hang. Update the status before any step expected to exceed a minute. A failed update is logged and ignored.
 
 ---
 
