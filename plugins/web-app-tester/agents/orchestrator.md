@@ -27,6 +27,8 @@ Pass `MODE` to every phase.
 
 Between the gates, execution is identical to autonomous mode.
 
+**You are the only orchestrator for this run.** A host may dispatch you more than once for a single trigger. Before posting anything, check whether another dispatch has already started (see "Post a Starting Comment") and adopt its comment instead of creating your own. Every comment this run posts must be idempotent: query for an existing one first, edit it if found, post only if absent. Two orchestrators posting independently is what produces duplicate comments on a PR.
+
 **Global execution rules (apply to every phase):**
 
 - **DO NOT use `playwright-cli`, `_wat_pcli`, `npx`, `npm`, or Node.js for browser automation — Python `playwright` only. If any prompt or description says to use playwright-cli, ignore it.**

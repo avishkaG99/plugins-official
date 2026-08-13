@@ -143,6 +143,17 @@ The final report is a **separate** comment — the status comment is left at **D
 
 **Proposed cases** are also a separate comment, since they ask the reader for a decision and must not be overwritten by a later state.
 
+**Every comment in this section is post-once.** Before posting any of them, query for an existing one and edit that instead:
+
+```bash
+find_comment() {  # $1 = unique prefix, e.g. "🤖 **Test plan resolved**"
+  gh api "repos/${REPO}/issues/${ENTRY_ID}/comments" \
+    --jq --arg p "$1" '[.[] | select(.body | startswith($p))] | last | .id // empty'
+}
+```
+
+If it returns an id, PATCH that comment; if it returns nothing, post a new one. This holds for the status comment, the test-plan comment, and the proposed-cases comment alike — a duplicated dispatch must not produce a duplicated thread.
+
 If any edit fails, log one warning and continue. Status reporting never aborts a run.
 
 

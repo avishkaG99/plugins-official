@@ -6,6 +6,8 @@ argument-hint: [pr <n> | issue <n> | wi <id>] [--env <name>] [--url <url>] [--ro
 
 Run automated web app behaviour verification for $ARGUMENTS.
 
+**Invoke the orchestrator agent exactly once, and wait for it to finish.** It owns the whole run and posts every comment itself. Do not spawn it a second time — not to "retry", not because the first invocation is taking a while, and not because its progress is not visible to you. A second orchestrator duplicates every comment on the PR and doubles the cost, because both run to completion independently. If the first invocation returns an error, report that error; do not re-dispatch.
+
 ## What This Does
 
 Invokes the **orchestrator** agent to:
