@@ -303,11 +303,17 @@ print(f"RUN_DURATION_S={RUN_DURATION_S}")
 LOG.close()
 ```
 
-**Execute the script:**
+**Before executing**, update the status comment (see `providers/github.md` "Progress Heartbeats") to say the script is starting, how many cases it covers, and that it runs to completion before the next update. This is the single longest silence in a run — a 52-case plan can occupy several minutes inside one invocation.
+
+**Have the script report its own progress.** `log_step` already prints each `STEP_RESULT` line to stdout as it goes, so run it unbuffered and stream the output rather than waiting for the process to finish:
 
 ```bash
-PYTHONUTF8=1 $PYTHON _wat_run/test_script.py 2>&1
+PYTHONUTF8=1 $PYTHON -u _wat_run/test_script.py 2>&1 | tee _wat_run/stdout.txt
 ```
+
+`-u` matters: without it Python buffers stdout when piped, and every line arrives at once at the end — which is exactly the silence the heartbeat is meant to remove.
+
+For plans over ~20 cases, split execution into batches of roughly 10 cases per invocation, updating the status comment between batches with the running pass/fail/blocked tally. Each batch reuses the same storage state and starts from a fresh context, so batching changes pacing and visibility, not results.
 
 **Read the log:**
 

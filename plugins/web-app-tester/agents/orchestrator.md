@@ -205,6 +205,10 @@ Target the comment to the entry artefact:
 
 If posting the starting comment fails, output a single warning line and continue — do not stop the run.
 
+**Capture the comment's ID as `STATUS_COMMENT_ID`** and keep it in scope for every phase. The run updates that one comment as it progresses rather than posting new ones — see `providers/github.md` "Progress Heartbeats" for the exact calls and the points at which to fire them.
+
+**Heartbeat discipline (applies to every phase):** a run routinely goes 60–120 seconds without visible output, which is indistinguishable from a hang. Before starting any step you expect to exceed roughly a minute — browser install, exploration, the main test script, report composition — update the status comment first, naming what is about to happen and whether it will report intermediate progress. Update again when it finishes. A failed heartbeat is logged and ignored; it never aborts the run.
+
 ---
 
 ## Phase 0.5 — Verify the Worktree Matches the Entry (`pr` entry only)

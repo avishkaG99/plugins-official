@@ -99,6 +99,48 @@ EOF
 )"
 ```
 
+## Progress Heartbeats
+
+A run regularly goes 60–120 seconds with no visible output — resolving the sheet, exploring selectors, and executing a long plan all happen silently. From the outside that is indistinguishable from a hung job, so the run must say where it is.
+
+**Capture the starting comment's ID** so later updates edit it in place instead of posting a new comment each time. One comment that changes is readable; six comments are noise.
+
+```bash
+STATUS_COMMENT_ID=$(gh api "repos/${REPO}/issues/${PR_NUMBER}/comments" \
+  --jq 'map(select(.user.login=="github-actions[bot]" or (.body|startswith("🤖 **Web app test in progress**")))) | last | .id')
+```
+
+**Update it** at each phase boundary, and whenever a single step is expected to exceed ~60 seconds:
+
+```bash
+gh api --method PATCH "repos/${REPO}/issues/comments/${STATUS_COMMENT_ID}" \
+  -f body="$(cat <<'EOF'
+🤖 **Web app test in progress**
+
+**Now:** <current activity>
+**Done:** <phases completed>
+**Next:** <what follows>
+
+_Updated <UTC timestamp>. The full report replaces this comment when the run completes._
+EOF
+)" >/dev/null
+```
+
+Post an update at each of these points — they bracket the longest silences:
+
+| Point | `Now:` reads |
+|---|---|
+| Worktree corrected (Phase 0.5) | `Re-pointed the workspace at the PR head (<sha>)` |
+| Sheet resolved (Phase 1) | `Loaded <n> active cases from <sheet path>` |
+| Chromium ready (Phase 2 step 1) | `Browser ready — exploring the app for stable selectors` |
+| Execution starting | `Executing <n> test cases against <url>` |
+| Every ~10 cases, or 90s, whichever first | `Executed <k>/<n> cases — <p> passed, <f> failed, <b> blocked` |
+| Report composing (Phase 3) | `Composing the report` |
+
+The periodic execution update is the important one: a 52-case plan spends most of its wall clock inside a single script invocation. When the plan is long enough that intermediate progress cannot be reported from inside the script, say so explicitly in the "Executing" update — `this step runs to completion before the next update` — so a long silence is expected rather than alarming.
+
+If any heartbeat call fails, continue the run — a failed status update must never abort a test run. Never post heartbeat content as a new comment when `STATUS_COMMENT_ID` is known.
+
 **Verify mode (`MODE=verify`) — post the verification variant on the issue:**
 
 ```bash
