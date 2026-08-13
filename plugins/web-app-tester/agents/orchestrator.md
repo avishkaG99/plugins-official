@@ -210,7 +210,7 @@ If posting the starting comment fails, output a single warning line and continue
 1. Starting comment (this one)
 2. **Test plan resolved** — after Phase 1: sheet path, active-case count, target URL, and whether the workspace had to be corrected
 3. **Proposed cases** — only when coverage is missing
-4. **Execution tally** — created once when execution begins, then edited in place every ~10 cases or ~90 seconds (the one exception to separate comments, since it repeats)
+4. **Execution tally** — created once when execution begins, then edited in place every 5 cases or ~45 seconds (the one exception to separate comments, since it repeats)
 5. **Final report**
 
 **Progress discipline (every phase):** a run routinely goes 60–120 seconds without visible output, which is indistinguishable from a hang. Post or update the relevant comment before starting any step expected to exceed roughly a minute — browser install, exploration, the main test script, report composition. A failed progress post is logged and ignored; it never aborts the run.
@@ -282,7 +282,23 @@ label — the run reads the most recent proposal comment.
 Apply the approved rows, then test everything.
 
 1. Complete Phase 0.5 so the worktree is at the PR head — the commit must land on the PR's branch, not the default branch.
-2. **Locate the approved rows.** Read the most recent `## 🤖 Proposed Test Cases` comment on the PR. If a later human reply contains an edited CSV block, that reply wins — the human's version is authoritative over the agent's original.
+2. **Locate the approved rows and confirm the answer.** Read the most recent proposal comment on the PR and inspect its checkboxes:
+
+   ```bash
+   gh api "repos/${REPO}/issues/${ENTRY_ID}/comments" \
+     --jq 'map(select(.body|contains("New feature detected"))) | last | .body'
+   ```
+
+   | State | Meaning | Action |
+   |---|---|---|
+   | `- [x] ✅ **Yes**` | Approved | Append, commit, run the enlarged suite |
+   | `- [x] ❌ **No**` | Declined | Do not touch the sheet; run the existing cases and note the decline |
+   | Neither ticked | No response | Same as declined, but reported as `no response` |
+   | Both ticked | Ambiguous | Post one line asking for a single choice and stop |
+
+   Reaching this step via the approval **label** counts as a Yes even when no box is ticked — the label is the alternative approval path, not a second gate.
+
+   If a later human reply contains an edited CSV block, that reply wins — the human's version is authoritative over the agent's original.
 3. **Validate every row before writing.** Each must have all sheet columns, an ID that is unused and continues the sequence, `Status=Active`, and `Added In=PR#<n>`. Reject the batch and stop if any row is malformed, duplicates an existing ID, or changes an existing row — appending is the only permitted edit.
 4. **Append and commit** to the PR head branch:
 

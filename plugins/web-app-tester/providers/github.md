@@ -131,13 +131,51 @@ When no sheet was found and the plan was auto-generated or scraped, say so plain
 
 ### 3. Proposed cases — post only when coverage is missing
 
-Post when the PR adds user-facing behaviour no `Active` case covers. This is a **separate comment** from the plan and from the report, because it is the one that asks the author for a decision. See "Coverage-First Flow" in `agents/orchestrator.md` for what happens next.
+Post when the PR adds user-facing behaviour no `Active` case covers. This is a **separate comment** from the plan and from the report, because it is the one that asks the author for a decision.
+
+**Ask a direct question and give a clickable answer.** GitHub comments cannot render a dropdown, but task-list checkboxes are interactive — a reader ticks one in the rendered comment without editing markdown. Use one checkbox per option and state plainly that ticking is the whole action:
+
+```bash
+gh pr comment ${PR_NUMBER} --body "$(cat <<'EOF'
+🤖 **New feature detected — add test cases?**
+
+This PR adds **<feature>**, which no active case in `<sheet path>` covers.
+The suite currently holds **<n> active cases**; these would make it **<n+k>**.
+
+<one-line summary per proposed case, e.g.:>
+- `TC-053` — create a saved view (Happy)
+- `TC-054` — delete a saved view (Happy)
+
+<details>
+<summary>Show the exact rows that would be appended</summary>
+
+```csv
+<the full CSV rows>
+```
+</details>
+
+---
+
+**Do you want these added to `<sheet path>` and committed to this PR?**
+
+- [ ] ✅ **Yes** — append them, commit to this branch, then run all <n+k> cases
+- [ ] ❌ **No** — leave the sheet alone and test the existing <n> cases
+
+_Tick a box, or apply the `ai-dlc/pr/test-cases-approved` label — either works.
+Ignoring this is fine too: the next ordinary run tests the <n> existing cases._
+EOF
+)"
+```
+
+**Reading the answer.** On the next run, fetch this comment and check which box is ticked (`- [x]`). Treat the ticked "Yes" as approval, a ticked "No" as a decline, and neither ticked as no decision — which is the same as a decline for behaviour, but is reported differently (`no response` vs `declined`). If **both** are ticked, do not guess: post one line asking for a single choice and stop.
+
+An edited CSV block in a human reply still wins over the agent's original rows.
 
 Post nothing when coverage is complete — silence is the correct signal there; the final report states that no gap was found.
 
 ### 4. Execution tally — one comment, edited in place
 
-This is the exception to the one-comment-per-milestone rule. It fires every ~10 cases or ~90 seconds, so it edits itself rather than posting repeatedly. Create it once when execution starts, capture its ID, then PATCH it:
+This is the exception to the one-comment-per-milestone rule. It fires every 5 cases or ~45 seconds, so it edits itself rather than posting repeatedly. Create it once when execution starts, capture its ID, then PATCH it:
 
 ```bash
 TALLY_ID=$(gh pr comment ${PR_NUMBER} --body "🤖 **Executing** — 0/<n> cases" 2>/dev/null \

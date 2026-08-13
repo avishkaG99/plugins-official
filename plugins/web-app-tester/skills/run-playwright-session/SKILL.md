@@ -313,7 +313,7 @@ PYTHONUTF8=1 $PYTHON -u _wat_run/test_script.py 2>&1 | tee _wat_run/stdout.txt
 
 `-u` matters: without it Python buffers stdout when piped, and every line arrives at once at the end — which is exactly the silence the heartbeat is meant to remove.
 
-For plans over ~20 cases, split execution into batches of roughly 10 cases per invocation, updating the status comment between batches with the running pass/fail/blocked tally. Each batch reuses the same storage state and starts from a fresh context, so batching changes pacing and visibility, not results.
+For plans over ~10 cases, split execution into batches of **5 cases** per invocation, updating the status comment between batches with the running pass/fail/blocked tally. Each batch reuses the same storage state and starts from a fresh context, so batching changes pacing and visibility, not results.
 
 **Read the log:**
 
