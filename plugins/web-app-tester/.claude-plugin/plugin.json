@@ -1,0 +1,34 @@
+{
+  "name": "web-app-tester",
+  "version": "1.4.0",
+  "description": "Automated web app behaviour verification triggered from a GitHub PR/Issue or Azure DevOps PR/Bug. Resolves the target URL from named environments in .web-app-tester.json (or scrapes it from comments), runs authenticated via Playwright storage states, executes the repository's committed test case sheet when one exists (every Active case, every run) or otherwise finds/auto-generates a test plan using the Webwright workflow (Python/Playwright, headless Chromium), proposes ready-to-paste cases for uncovered behaviour, and posts a structured test execution report. Includes a bug-verification mode (/verify-bug) that re-verifies a reported bug and posts a STILL REPRODUCIBLE / NOT REPRODUCIBLE / INCONCLUSIVE verdict on the bug itself.",
+  "author": {
+    "name": "Xianix",
+    "email": "hello@xianix.com",
+    "url": "https://xianix.com"
+  },
+  "homepage": "https://xianix.com",
+  "repository": "https://github.com/xianix-team/plugins-official",
+  "license": "MIT",
+  "keywords": [
+    "web-testing",
+    "playwright",
+    "e2e",
+    "qa",
+    "browser-testing",
+    "pr-testing",
+    "preview-url",
+    "github",
+    "azure-devops",
+    "bug-verification",
+    "authenticated-testing",
+    "test-automation"
+  ],
+  "commands": ["./commands/test-web-app.md", "./commands/web-app-test.md", "./commands/verify-bug.md"],
+  "agents": [
+    "./agents/orchestrator.md"
+  ],
+  "skills": "./skills/",
+  "outputStyles": "./styles/",
+  "providers": "./providers/"
+}
