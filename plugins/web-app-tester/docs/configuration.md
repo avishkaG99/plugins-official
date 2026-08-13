@@ -26,13 +26,62 @@ A consumer repo may place a `.web-app-tester.json` file at its root to give the 
 
 | Field | Required | Meaning |
 |---|---|---|
-| `environments.<name>.baseUrl` | yes | Base URL for the environment |
+| `environments.<name>.baseUrl` | yes | Base URL for the environment. May contain the `{branch}` placeholder — see below. |
+| `environments.<name>.previewFromComment` | no (default `false`) | When `true`, resolve the URL from the deployment bot's PR comment (Vercel/Netlify/Cloudflare) before falling back to `baseUrl`. Most reliable for preview environments. |
+| `environments.<name>.fallbackUrl` | no | URL used when the preview is unreachable, SSO-protected, or too long to resolve. Typically the production or `main` deployment. |
 | `environments.<name>.mutationsAllowed` | no (default `false`) | `false` = read-only mode for this env — data-modifying test cases are skipped with reason `Skipped — environment is read-only` (same enforcement as the legacy `PRODUCTION_WARNING`) |
 | `environments.<name>.storageStates` | no | Map of role → Playwright storage-state file path (relative to repo root) |
 | `environments.<name>.defaultRole` | no | Role used when the run doesn't demand a specific one via `--role` |
 | `defaultEnvironment` | no | Environment used when no `--env`/`--url` argument is given |
 | `authSetupCommand` | no | Command the plugin may run (at most once per run, from the repo root) to (re)generate storage-state files when they are missing or the app rejects the session |
 | `testSheet` | no | Path to the repository's committed test case sheet (CSV). When set, the sheet becomes the test plan and outranks comment-scraping and auto-generation. When unset, the plugin still discovers a sheet by convention — see below. |
+
+## Per-Branch Preview URLs
+
+A literal `baseUrl` pins every run to a single branch — a PR from `feat/x` gets tested against whatever branch was hardcoded, silently reporting results for the wrong code. Two ways to resolve the URL per run, in order of reliability.
+
+### Preferred — scrape the deployment bot's comment
+
+Vercel, Netlify, and Cloudflare Pages all post the preview URL on the PR as soon as the deployment is ready. That comment is authoritative: it names the exact URL that was deployed.
+
+```json
+{
+  "environments": {
+    "preview": {
+      "previewFromComment": true,
+      "baseUrl": "https://myapp-git-{branch}-myteam.vercel.app",
+      "fallbackUrl": "https://myapp-myteam.vercel.app"
+    }
+  }
+}
+```
+
+This matters because a host may publish **two** URLs for one deployment — a per-deployment hash (`myapp-8j2h61llk-myteam.vercel.app`) and a branch alias (`myapp-git-mybranch-myteam.vercel.app`). Only the branch alias is derivable from the branch name; the hash is not. Scraping picks up whichever the bot posted, so neither form has to be guessed.
+
+`baseUrl` stays as the fallback for when no bot comment exists (a manual run, or a deployment that has not finished yet).
+
+### Fallback — the `{branch}` placeholder
+
+```json
+{
+  "defaultEnvironment": "preview",
+  "environments": {
+    "preview": {
+      "baseUrl": "https://myapp-git-{branch}-myteam.vercel.app",
+      "fallbackUrl": "https://myapp-myteam.vercel.app",
+      "mutationsAllowed": true
+    }
+  }
+}
+```
+
+`{branch}` expands to the PR's head branch, slugified the way the host does: lowercase, non-alphanumerics replaced with `-`, runs collapsed, ends trimmed. `feat/Add_Login` → `feat-add-login`.
+
+**Verify the pattern against a real deployment before relying on it.** The team/project segment differs per account, and Vercel truncates the hostname with a hash when the first DNS label exceeds 63 characters — a case the placeholder cannot reproduce. Long branch names fall back to `fallbackUrl`.
+
+The resolved URL is probed for reachability before any case runs. If it is unreachable or redirects to `vercel.com/sso-api` (Deployment Protection), `fallbackUrl` is used when set; otherwise the run stops and reports the environment as unreachable rather than failing every case.
+
+`--url` still overrides everything, which is the escape hatch when a preview URL does not follow the pattern.
 
 ## Repository Test Case Sheet
 

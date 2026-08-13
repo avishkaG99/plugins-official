@@ -95,6 +95,36 @@ If present, read it (schema in `docs/configuration.md`) and resolve:
    2. `ARG_ENV` set → `environments.<ARG_ENV>.baseUrl` (`TEST_URL_SOURCE=config`). If the named environment does not exist in the config, output one error line and stop: `Error: environment '<ARG_ENV>' not found in .web-app-tester.json.`
    3. `defaultEnvironment` set → that environment's `baseUrl` (`TEST_URL_SOURCE=config`)
    4. Otherwise → no candidate URL; Phase 1 falls back to comment-scraping (`TEST_URL_SOURCE=scraped`)
+1a. **Deployment-bot comment scraping (preferred for preview environments)** — when the environment sets `previewFromComment: true`, resolve the URL from the deployment bot's own PR comment **before** trying `baseUrl`. This is the most reliable source: the bot posts the exact URL it deployed, so it survives branch renames, per-deployment hash hostnames (`myapp-8j2h61llk-team.vercel.app`), and any naming scheme the host changes underneath you.
+
+   Scan the PR comments (already fetched in Phase 1) for a deployment bot's preview URL, newest comment first:
+
+   - **Vercel** (`vercel[bot]`) — the "Preview" row of its deployments table; also `Visit Preview`, `Inspect`.
+   - **Netlify** (`netlify[bot]`) — "Deploy Preview ready", `deploy-preview-<n>--<site>.netlify.app`.
+   - **Cloudflare Pages** (`cloudflare-workers-and-pages[bot]`) — the branch preview URL.
+
+   Take the **most recent** matching comment — later deployments supersede earlier ones. Prefer a stable branch alias (containing `-git-`) over a per-deployment hash URL when the comment offers both, since the alias always points at the newest deployment for that branch.
+
+   If no bot comment is found, fall through to `baseUrl` (with `{branch}` substitution below), then `fallbackUrl`.
+
+1b. **Placeholder substitution in `baseUrl`** — a config `baseUrl` may contain `{branch}`, which expands to the **deployment-slug form of the PR's head branch**. This exists because per-branch preview deployments (Vercel, Netlify, …) mint a distinct hostname per branch, so a literal `baseUrl` would pin every run to whichever branch was hardcoded.
+
+   Resolve `{branch}` as follows:
+
+   1. Take the head branch name — from the PR metadata fetched in Phase 1 (`headRefName` on GitHub, source ref on Azure DevOps). For a non-PR entry, use the current checkout: `git rev-parse --abbrev-ref HEAD`.
+   2. Slugify it the way the host does: lowercase, replace every character that is not `[a-z0-9]` with `-`, collapse runs of `-`, and strip leading/trailing `-`. (`feat/Add_Login` → `feat-add-login`.)
+   3. Substitute into `baseUrl`.
+
+   **Vercel's 63-character hostname limit:** if the resulting first DNS label exceeds 63 characters, Vercel truncates the branch slug and appends a hash, which this substitution cannot reproduce. When the substituted label would exceed 63 characters, do not guess — fall back to the environment's `fallbackUrl` if set, else report `Error: resolved preview hostname exceeds 63 characters; set fallbackUrl or use --url.` and stop.
+
+   **Always verify reachability before executing** (this is cheap and prevents a whole run reporting BLOCKED against a dead host):
+
+   ```bash
+   curl -s -o /dev/null -w "%{http_code}" --max-time 15 "<resolved baseUrl>"
+   ```
+
+   A non-2xx/3xx response, or a `3xx` whose `Location` points at `vercel.com/sso-api` (Deployment Protection), means the preview is not testable. Fall back to `fallbackUrl` when set; otherwise stop with the "no testable URL" comment rather than reporting every case as failed — an unreachable environment blocks cases, it does not fail them.
+
 2. **`MUTATIONS_ALLOWED`** — when the URL came from config: the environment's `mutationsAllowed` (default `false`), authoritative. When the URL is scraped or from `ARG_URL`: unset here; Phase 1 applies the 1.0 substring heuristic.
 3. **`ROLE`** — `ARG_ROLE` if given, else the environment's `defaultRole`, else unset.
 4. **`STORAGE_STATE`** — the environment's `storageStates.<ROLE>` path, if both exist. If `ARG_ROLE` names a role with no storage-state entry for the resolved environment, output one error line and stop: `Error: role '<ARG_ROLE>' has no storage state configured for environment '<name>'.`
