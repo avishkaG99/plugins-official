@@ -256,7 +256,7 @@ Never include the model name or ID in the report.
 6. **Never include secrets.** Keep `[REDACTED]` values redacted. If you spot a credential-like value that was not redacted upstream, redact it here before posting.
 7. **Sheet-sourced runs are 1:1 with the sheet.** When `TEST_SHEET_PATH` is set, every `Active` case must appear exactly once in the results table — executed, or listed with an explicit reason. Never silently drop a case, and never merge two cases into one row.
 8. **Preserve case IDs and titles verbatim** from the sheet, so results stay auditable against it.
-9. **Never modify the repository** — no edits to the sheet, no commits, no pushes. Proposals are comment text only. **Sole exception:** an `--apply-cases` run, where the orchestrator commits approved rows before this phase runs; see "Coverage-First Flow" in `agents/orchestrator.md`. This skill still never writes — the commit happens upstream of it.
+9. **Never modify the repository** — no edits to the sheet, no commits, no pushes. Proposals are comment text only. **Sole exception:** an `--apply-cases` run, where the orchestrator commits approved rows before this phase runs; see `skills/apply-proposed-cases/SKILL.md`. This skill still never writes — the commit happens upstream of it.
 
 Store as `REPORT_BODY`.
 
