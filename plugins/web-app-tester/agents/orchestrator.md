@@ -299,21 +299,52 @@ Apply the approved rows, then test everything.
    Reaching this step via the approval **label** counts as a Yes even when no box is ticked — the label is the alternative approval path, not a second gate.
 
    If a later human reply contains an edited CSV block, that reply wins — the human's version is authoritative over the agent's original.
-3. **Validate every row before writing.** Each must have all sheet columns, an ID that is unused and continues the sequence, `Status=Active`, and `Added In=PR#<n>`. Reject the batch and stop if any row is malformed, duplicates an existing ID, or changes an existing row — appending is the only permitted edit.
-4. **Append and commit** to the PR head branch:
+
+3. **Echo the decision back before acting on it.** Edit the proposal comment to record what was read, so the choice is visible and auditable rather than inferred from a later commit. Append a resolution block to the existing body (keep the original question and rows intact, so the thread still shows what was asked):
+
+   ```bash
+   gh api --method PATCH "repos/${REPO}/issues/comments/${PROPOSAL_COMMENT_ID}" \
+     -f body="${ORIGINAL_BODY}
+
+---
+
+**✅ Approved** by @<login> at <UTC timestamp> — via <ticked checkbox | \`ai-dlc/pr/test-cases-approved\` label>.
+
+Appending \`<TC-0NN>\`, \`<TC-0NN>\` to \`<sheet path>\` and running all <n+k> cases. The sheet change lands as its own commit on this branch." >/dev/null
+   ```
+
+   Use the matching wording for the other outcomes — `**❌ Declined**`, `**➖ No response**` — each naming what happens next (`testing the existing <n> cases; the sheet is unchanged`). Post this **before** the commit, so a run that dies mid-way still leaves a record of what it decided.
+
+   This edit is the one permitted change to the proposal comment; never rewrite the question or the proposed rows themselves.
+4. **Validate every row before writing.** Each must have all sheet columns, an ID that is unused and continues the sequence, `Status=Active`, and `Added In=PR#<n>`. Reject the batch and stop if any row is malformed, duplicates an existing ID, or changes an existing row — appending is the only permitted edit.
+5. **Append and commit** to the PR head branch:
 
    ```bash
    git checkout -q "${PR_HEAD_BRANCH}"
    # append validated rows to the sheet, preserving its exact CSV dialect and trailing newline
    git add "${TEST_SHEET_PATH}"
-   git commit -m "test: add cases for <feature> (PR #<n>)"
+   git commit -m "$(cat <<'MSG'
+test: add cases for <feature> (PR #<n>)
+
+Appends <TC-0NN>..<TC-0NN> covering <feature>, proposed by web-app-tester
+and approved on the PR. Existing rows are untouched.
+MSG
+)"
    git push origin "${PR_HEAD_BRANCH}"
    ```
 
+   **Stage the sheet and nothing else.** `git add` names the sheet path explicitly — never `git add -A` or `.`. The commit must contain exactly one changed file, so the sheet update is reviewable on its own and can be reverted without disturbing the PR's feature work. Verify before pushing:
+
+   ```bash
+   git show --stat --oneline HEAD | tail -n +2   # must list only the sheet
+   ```
+
+   If anything else appears — a stray `_wat_run/`, a lockfile, a generated route tree — reset and re-stage just the sheet. A test-case commit that carries unrelated changes is a defect even when the test run succeeds.
+
    Never rewrite, reorder, or renumber existing rows. Never force-push. If the push is rejected because the branch moved, re-fetch, re-apply the append on top, and retry once; if it still fails, stop and report rather than forcing.
-5. **Re-read the sheet from disk** after the commit, so the plan reflects the appended rows.
-6. **Run the full suite** — every `Active` case including the new ones — through Phases 1–3 as normal.
-7. Phase 3 reports `CASES_APPLIED` (the IDs committed) and the commit SHA in Notes, so the report states plainly that the sheet grew during this run.
+6. **Re-read the sheet from disk** after the commit, so the plan reflects the appended rows.
+7. **Run the full suite** — every `Active` case including the new ones — through Phases 1–3 as normal.
+8. Phase 3 reports `CASES_APPLIED` (the IDs committed) and the commit SHA in Notes, so the report states plainly that the sheet grew during this run.
 
 **This is the one circumstance in which the plugin writes to the repository.** It requires an explicit `--apply-cases` invocation; without that flag the never-modify rule in `skills/post-test-report/SKILL.md` applies unchanged. The token must have write access to the PR branch — if the push fails with a permissions error, report that specifically rather than silently continuing to the test run, since the suite would then omit the approved cases.
 

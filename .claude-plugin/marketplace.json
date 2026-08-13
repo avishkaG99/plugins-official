@@ -163,7 +163,7 @@
       "name": "web-app-tester",
       "source": "./plugins/web-app-tester",
       "description": "Automated web app behaviour verification triggered from a GitHub PR or Issue. Finds a testable URL from comments, runs or auto-generates a test plan using Playwright CLI (headless Chromium), and posts a structured test execution report as a GitHub comment.",
-      "version": "1.6.0",
+      "version": "1.7.0",
       "author": {
         "name": "Xianix",
         "email": "hello@xianix.com"
