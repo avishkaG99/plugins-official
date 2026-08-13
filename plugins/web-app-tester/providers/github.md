@@ -135,7 +135,7 @@ _Updated <ISO 8601 UTC>._
 | Starting | `⏳ Starting — installing Playwright and launching a browser.` |
 | Resolving | `⚙️ Resolving the test plan…` |
 | Ready | `📋 Ready — executing <n> cases.` |
-| Executing | `▶️ **<k>/<n> cases** · ✅ <p> passed · ❌ <f> failed · ⚪ <b> blocked` |
+| Executing | `▶️ **<k>/<n> cases** · ✅ <p> passed · ❌ <f> failed · ⚪ <b> blocked · ~<mm:ss> left` |
 | Reporting | `📝 Composing the report…` |
 | Done | `✅ Complete — <p>/<n> passed. See the report below.` |
 
@@ -145,6 +145,8 @@ _Updated <ISO 8601 UTC>._
 - Emit counts only — no parentheticals, no commentary, no "effective" or "auto-corrected" notes. Those belong in the final report, not a status line.
 - Counts must be monotonic: `<k>`, `<p>`, `<f>`, `<b>` never decrease between updates. A number going backwards means the tally is being recomputed rather than accumulated — recount from the log before posting.
 - Keep `_Updated …_` as the last line in every state; it is how a stalled run is spotted.
+- **Update after every case, not every fifth.** The edit is one API call against a comment that already exists; the cost is negligible next to a browser step, and a per-case tally is the difference between "is it moving?" and watching a number sit still.
+- **Include a remaining-time estimate.** Track elapsed wall-clock since the first case and project linearly: `remaining = elapsed / k × (n − k)`, rendered `~mm:ss left`. Omit it for the first two cases — the sample is too small to be useful — and drop it once `k == n`. It is an estimate from the current rate, so it moves as the rate does; do not smooth or pad it.
 
 The final report is a **separate** comment — the status comment is left at **Done** rather than being overwritten with it, so the run's trace and its result both remain readable.
 
@@ -172,6 +174,31 @@ The prefixes are fixed — use these exact strings, and never let a body's first
 A body whose first line no longer matches its prefix is unfindable, and the next update posts a duplicate instead of editing. That is the single most common cause of a thread filling with near-identical comments.
 
 If any edit fails, log one warning and continue. Status reporting never aborts a run.
+
+### The other two comments
+
+Both are separate posts, not states of the status comment, and both are post-once via `find_comment`.
+
+**Test plan resolved** — post as soon as the sheet is parsed, before any browser work. Answer two questions up front: how many cases were found, and whether the PR's new behaviour is among them.
+
+```
+🤖 **Test plan resolved**
+
+**Found <n> active test cases** in `<sheet>` — executing all of them.
+
+**Target:** <url>
+<optional: **Workspace:** re-pointed to the PR head (`<short sha>`)>
+
+<optional gap warning:>
+⚠️ This PR appears to add **<feature>**, which none of the <n> cases cover.
+Proposed cases will be posted for approval when the run finishes.
+```
+
+Derive the warning from `CHANGED_FILES` — the same analysis Phase 3 runs, done early enough to be useful. It is a heads-up, not a gate: the run proceeds with the existing cases either way.
+
+When no sheet was found and the plan was auto-generated or scraped, say that plainly here instead — it is the last moment the author can intervene.
+
+**New feature detected** — the approval request, posted when coverage is missing. Body and checkbox rules are in `skills/post-test-report/SKILL.md` §2f. It is always its own comment so a later status edit cannot overwrite the question.
 
 
 ## Posting the "No URL Found" Comment

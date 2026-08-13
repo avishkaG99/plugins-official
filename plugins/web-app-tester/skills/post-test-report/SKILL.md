@@ -215,7 +215,39 @@ TC-054,Notifications,Empty inbox shows a message,Negative,"1. Navigate to /notif
 Append these to `<TEST_SHEET_PATH>` if they look right.
 ```
 
-**Never modify the sheet, commit, push, or create a branch.** Propose only — a human appends approved rows, or approves an `--apply-cases` run that appends them. This section is the sole output of coverage analysis in a default run.
+**Post the proposal as its own comment with a clickable answer**, not as a paragraph buried at the end of the report. The reader has to be able to say yes without editing a CSV by hand. Use the `🤖 **New feature detected` comment from `providers/github.md` §3 — the same body in a default run as in a `--propose-only` run, so the answer is given the same way either way:
+
+```
+🤖 **New feature detected — add test cases?**
+
+This PR adds **Tags**, which no active case in `test-cases.csv` covers.
+The suite currently holds **52 active cases**; these would make it **55**.
+
+- `TC-053` — create a tag (Happy)
+- `TC-054` — delete an unused tag (Happy)
+- `TC-055` — deleting a tag in use is refused (Negative)
+
+<details><summary>Show the exact rows that would be appended</summary>
+
+```csv
+…
+```
+</details>
+
+---
+
+**Do you want these added to `test-cases.csv` and committed to this PR?**
+
+- [ ] ✅ **Yes** — append them, commit to this branch, then run all 55 cases
+- [ ] ❌ **No** — leave the sheet alone
+
+_Tick a box, or apply the `ai-dlc/pr/test-cases-approved` label. Ignoring this is fine —
+the sheet stays as it is._
+```
+
+The report itself then carries only a one-line pointer (`Proposed 3 cases for Tags — see the comment above`), so the decision lives in one place.
+
+**Never modify the sheet, commit, push, or create a branch here.** Proposing is this skill's only action; appending happens in an `--apply-cases` run after approval.
 
 If the PR introduces no uncovered user-facing behaviour, state that in one line instead of emitting an empty block:
 
