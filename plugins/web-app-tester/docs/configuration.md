@@ -32,6 +32,26 @@ A consumer repo may place a `.web-app-tester.json` file at its root to give the 
 | `environments.<name>.defaultRole` | no | Role used when the run doesn't demand a specific one via `--role` |
 | `defaultEnvironment` | no | Environment used when no `--env`/`--url` argument is given |
 | `authSetupCommand` | no | Command the plugin may run (at most once per run, from the repo root) to (re)generate storage-state files when they are missing or the app rejects the session |
+| `testSheet` | no | Path to the repository's committed test case sheet (CSV). When set, the sheet becomes the test plan and outranks comment-scraping and auto-generation. When unset, the plugin still discovers a sheet by convention — see below. |
+
+## Repository Test Case Sheet
+
+When a repo commits a test case sheet, that sheet is the source of truth for what gets tested — the plugin executes it instead of scraping a plan from comments or generating a happy-path substitute.
+
+Discovery order (first match wins):
+
+1. `testSheet` from this config
+2. `test-cases.csv` at the repo root
+3. `docs/test-cases.csv`
+4. Any `*test-case*.csv` at the repo root or in `docs/`
+
+Required columns: `ID`, `Feature`, `Title`, `Type`, `Steps`, `Expected Result`, `Notes`, `Status`, `Added In`.
+
+**Every row whose `Status` is `Active` runs, every time.** The plugin does not subset by feature or by relevance to the diff — a new feature is validated against the whole suite, not just its own cases. `Draft` and `Retired` rows never run.
+
+After the run, the plugin compares the PR's changes against the sheet's coverage and proposes ready-to-paste rows for any uncovered user-facing behaviour. **It never edits the sheet** — proposals go in the report comment and a human appends them.
+
+`PLAN_SOURCE` reads `sourced from repository test case sheet (<path>)` when this path was taken. Any other value means the sheet was not picked up.
 
 ## URL Resolution Precedence (all modes)
 

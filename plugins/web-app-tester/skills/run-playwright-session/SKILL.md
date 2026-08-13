@@ -19,6 +19,8 @@ This skill is invoked by the **orchestrator** agent. It is not a standalone slas
 | `STORAGE_STATE` | orchestrator (config resolution) | Path to a Playwright storage-state file for authenticated runs, if configured |
 | `AUTH_SETUP_COMMAND` | orchestrator (config resolution) | Command to (re)generate storage states, if configured |
 | `TEST_PLAN` | gather-test-context | Numbered/bulleted list of test cases |
+| `TEST_SHEET_PATH` | gather-test-context | Repository test case sheet path, when the plan came from one — else unset |
+| `TEST_SHEET_CASES` | gather-test-context | Count of `Active` sheet cases in the plan — else unset |
 | `DECISIVE_CHECK` | gather-test-context | Verify mode only: `BUG_SIGNAL` / `FIXED_SIGNAL` pair for the decisive final step |
 
 ## Outputs
@@ -335,4 +337,4 @@ GitHub PR/issue comments do not support file attachments via `gh comment`, so th
 
 ## Completion
 
-When this skill finishes, hand off to the Phase 3 skill the orchestrator dispatches (`skills/post-test-report/SKILL.md` for `MODE=test`, `skills/post-verdict-report/SKILL.md` for `MODE=verify`) with the inline result list, `MODE`, `TEST_URL`, `MUTATIONS_ALLOWED`, `RUN_START_TIME`, and `RUN_DURATION_S` in scope — plus, in verify mode, the decisive step's `<signal>` value and the `_wat_run/screenshots/` paths. The result list must contain one entry per test case in `TEST_PLAN`, in order, each with **all** fields populated as specified in the Outputs section above. If any field is genuinely not applicable for a test case (e.g. `action.ref` for a navigate, `action.input` for a click, `duration_ms` for a BLOCKED test case that never started), set it to `null` rather than omitting it.
+When this skill finishes, hand off to the Phase 3 skill the orchestrator dispatches (`skills/post-test-report/SKILL.md` for `MODE=test`, `skills/post-verdict-report/SKILL.md` for `MODE=verify`) with the inline result list, `MODE`, `TEST_URL`, `MUTATIONS_ALLOWED`, `PLAN_SOURCE`, `TEST_SHEET_PATH`, `TEST_SHEET_CASES`, `RUN_START_TIME`, and `RUN_DURATION_S` in scope — plus, in verify mode, the decisive step's `<signal>` value and the `_wat_run/screenshots/` paths. The result list must contain one entry per test case in `TEST_PLAN`, in order, each with **all** fields populated as specified in the Outputs section above. If any field is genuinely not applicable for a test case (e.g. `action.ref` for a navigate, `action.input` for a click, `duration_ms` for a BLOCKED test case that never started), set it to `null` rather than omitting it.

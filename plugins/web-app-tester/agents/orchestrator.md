@@ -99,8 +99,9 @@ If present, read it (schema in `docs/configuration.md`) and resolve:
 3. **`ROLE`** — `ARG_ROLE` if given, else the environment's `defaultRole`, else unset.
 4. **`STORAGE_STATE`** — the environment's `storageStates.<ROLE>` path, if both exist. If `ARG_ROLE` names a role with no storage-state entry for the resolved environment, output one error line and stop: `Error: role '<ARG_ROLE>' has no storage state configured for environment '<name>'.`
 5. **`AUTH_SETUP_COMMAND`** — the config's `authSetupCommand`, if set.
+6. **`TEST_SHEET`** — the config's `testSheet` path, if set. This is an explicit pointer to the repository's committed test case sheet; when unset, Phase 1 discovers the sheet by convention (`test-cases.csv`, `docs/test-cases.csv`, …). Optional — a repo with no sheet behaves exactly as before.
 
-Export `TEST_URL_SOURCE`, the candidate URL, `MUTATIONS_ALLOWED`, `ROLE`, `STORAGE_STATE`, and `AUTH_SETUP_COMMAND` as inputs to every phase. Never read or print the *contents* of storage-state files — only their paths.
+Export `TEST_URL_SOURCE`, the candidate URL, `MUTATIONS_ALLOWED`, `ROLE`, `STORAGE_STATE`, `AUTH_SETUP_COMMAND`, and `TEST_SHEET` as inputs to every phase. Never read or print the *contents* of storage-state files — only their paths.
 
 ---
 
