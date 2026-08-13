@@ -134,10 +134,20 @@ _Updated <ISO 8601 UTC>._
 |---|---|
 | Starting | `⏳ Starting — installing Playwright and launching a browser.` |
 | Resolving | `⚙️ Resolving the test plan…` |
-| Ready | `📋 Ready — executing <n> cases.` |
+| Found | `📋 Found **<n> test cases** in \`<sheet>\`.` |
+| Checking | `🔍 Found **<n> test cases** in \`<sheet>\` — checking for missing coverage…` |
+| Gap found | `⚠️ Found **<n> test cases**, and **<k> more** this PR needs — awaiting your answer below.` |
+| No gap | `✅ Found **<n> test cases** — coverage is complete. Executing now.` |
 | Executing | `▶️ **<k>/<n> cases** · ✅ <p> passed · ❌ <f> failed · ⚪ <b> blocked · ~<mm:ss> left` |
 | Reporting | `📝 Composing the report…` |
+| Awaiting | `⏸️ Paused — <k> proposed cases awaiting your answer. Nothing has been tested yet.` |
+| Declined | `▶️ Proposal declined — executing the existing <n> cases.` |
 | Done | `✅ Complete — <p>/<n> passed. See the report below.` |
+| Failed | `💥 Run failed — <one-line reason>. <k>/<n> cases had completed.` |
+
+**Always reach a terminal state.** Every run ends at `Done`, `Awaiting`, `Declined`, or `Failed` — never mid-sequence. If a phase raises an unrecoverable error, set `Failed` with the reason and the count reached before exiting. A status frozen at `Executing 23/52` is indistinguishable from a hung run, and the reader has no way to know the run is over.
+
+**Found → Checking → Gap found / No gap runs before any test executes.** The reader watches one comment answer three questions in order: how many cases exist, whether anything is missing, and what happens next. Only then does Executing begin.
 
 **Rules for the Executing line, which repeats:**
 
@@ -145,6 +155,7 @@ _Updated <ISO 8601 UTC>._
 - Emit counts only — no parentheticals, no commentary, no "effective" or "auto-corrected" notes. Those belong in the final report, not a status line.
 - Counts must be monotonic: `<k>`, `<p>`, `<f>`, `<b>` never decrease between updates. A number going backwards means the tally is being recomputed rather than accumulated — recount from the log before posting.
 - Keep `_Updated …_` as the last line in every state; it is how a stalled run is spotted.
+- **Never leave a state line blank or partially filled.** Every PATCH must carry a complete line with all counts resolved to integers. If a count is not yet known, use the last known value rather than an empty string — a status that renders blank is worse than one that is briefly stale, because the reader cannot tell it from a crash. Compose the body first, verify no placeholder (`<k>`, `<n>`, empty) survives, then send it.
 - **Update after every case, not every fifth.** The edit is one API call against a comment that already exists; the cost is negligible next to a browser step, and a per-case tally is the difference between "is it moving?" and watching a number sit still.
 - **Include a remaining-time estimate.** Track elapsed wall-clock since the first case and project linearly: `remaining = elapsed / k × (n − k)`, rendered `~mm:ss left`. Omit it for the first two cases — the sample is too small to be useful — and drop it once `k == n`. It is an estimate from the current rate, so it moves as the rate does; do not smooth or pad it.
 
@@ -152,16 +163,29 @@ The final report is a **separate** comment — the status comment is left at **D
 
 **Proposed cases** are also a separate comment, since they ask the reader for a decision and must not be overwritten by a later state.
 
+**A run posts at most four comments, ever.** No matter how many times a PR is triggered, the thread holds exactly these:
+
+| # | Comment | Lifecycle |
+|---|---|---|
+| 1 | `🤖 **Web app test in progress**` | posted once, edited through every state |
+| 2 | `🤖 **Test plan resolved**` | posted once when the sheet is parsed |
+| 3 | `🤖 **New feature detected` | posted only when coverage is missing; edited once when answered |
+| 4 | The test execution report | posted once at the end |
+
+Comment 3 is skipped entirely when the sheet already covers the PR, so a fully-covered run posts three. Anything beyond this list is a defect — re-triggering a PR must edit these four, never add a fifth.
+
 **Every comment in this section is post-once.** Before posting any of them, query for an existing one and edit that instead:
 
 ```bash
 find_comment() {  # $1 = unique prefix, e.g. "🤖 **Test plan resolved**"
   gh api "repos/${REPO}/issues/${ENTRY_ID}/comments" \
-    --jq --arg p "$1" '[.[] | select(.body | startswith($p))] | last | .id // empty'
+    --jq --arg p "$1" '[.[] | select(.body | startswith($p))] | first | .id // empty'
 }
 ```
 
 If it returns an id, PATCH that comment; if it returns nothing, post a new one.
+
+The query takes `first` — the **oldest** match — on purpose. A PR whose label has been re-applied has several runs against it; with `last`, each run adopts a different comment and the thread grows one status comment per run. Taking the oldest makes every run converge on the same one.
 
 The prefixes are fixed — use these exact strings, and never let a body's first line drift from them:
 

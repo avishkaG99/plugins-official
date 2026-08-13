@@ -313,7 +313,9 @@ PYTHONUTF8=1 $PYTHON -u _wat_run/test_script.py 2>&1 | tee _wat_run/stdout.txt
 
 `-u` matters: without it Python buffers stdout when piped, and every line arrives at once at the end — which is exactly the silence the heartbeat is meant to remove.
 
-For plans over ~10 cases, split execution into batches of **10 cases** per invocation. Update the status comment **after every case** — the script prints a `STEP_RESULT` line as each one finishes, so read them as they stream and PATCH the tally per line rather than waiting for the batch to end. Batching bounds how much is lost if one invocation dies; it is not the reporting cadence. Each batch reuses the same storage state and starts from a fresh context, so batching changes pacing and visibility, not results.
+For plans over ~10 cases, split execution into batches of **10 cases** per invocation. Update the status comment **after every case** — the script prints a `STEP_RESULT` line as each one finishes, so read them as they stream and PATCH the tally per line rather than waiting for the batch to end.
+
+Keep a running tally in the agent's own state (`k`, `p`, `f`, `b`) and increment it from each parsed line. **Never recompute the tally from a partial log**: a `tail` or a half-flushed file yields fewer cases than have actually run, which is what makes a status jump backwards or render blank. If a line cannot be parsed, keep the previous tally and carry on — a repeated number is honest, a blank one is not. Batching bounds how much is lost if one invocation dies; it is not the reporting cadence. Each batch reuses the same storage state and starts from a fresh context, so batching changes pacing and visibility, not results.
 
 **Read the log:**
 

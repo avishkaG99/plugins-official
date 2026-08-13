@@ -241,9 +241,12 @@ The suite currently holds **52 active cases**; these would make it **55**.
 - [ ] ✅ **Yes** — append them, commit to this branch, then run all 55 cases
 - [ ] ❌ **No** — leave the sheet alone
 
-_Tick a box, or apply the `ai-dlc/pr/test-cases-approved` label. Ignoring this is fine —
-the sheet stays as it is._
+_Tick a box above — that is all it takes. You can also apply the
+`ai-dlc/pr/test-cases-approved` label or reply `/approve-cases`.
+Ignoring this is fine; the sheet stays as it is._
 ```
+
+**End the body with nothing after the checkboxes except that note.** A tick fires the run by editing this comment, so the body is also the trigger: anything appended below the boxes becomes part of what the rule matches.
 
 The report itself then carries only a one-line pointer (`Proposed 3 cases for Tags — see the comment above`), so the decision lives in one place.
 
