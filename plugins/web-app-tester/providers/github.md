@@ -112,32 +112,39 @@ gh api --method PATCH "repos/${REPO}/issues/comments/${STATUS_ID}" \
 
 ### The states
 
-Move through these in order, editing the same comment each time:
+**The first line never changes.** Every state keeps the exact heading `🤖 **Web app test in progress**` — that heading is the key `find_comment` matches on, so altering it makes the next update post a new comment instead of editing this one. The state goes on the *second* line.
 
-| State | Body |
-|---|---|
-| **Starting** | `🤖 **Web app test in progress**` + the original wording |
-| **Resolving** | `⚙️ Resolving the test plan…` — after the worktree check, before Phase 1 finishes |
-| **Ready** | `📋 **Testing <n> cases** from \`<sheet>\` against <url>` — plan resolved, browser starting |
-| **Executing** | `▶️ **<k>/<n> cases** · ✅ <p> · ❌ <f> · ⚪ <b>` — refreshed every 5 cases |
-| **Reporting** | `📝 Composing the report…` |
-| **Done** | `✅ **Complete** — <p>/<n> passed. See the report below.` |
-
-Include a trailing `_Updated <UTC time>._` on every state so a stalled run is visibly stalled — an unchanged timestamp is the signal.
-
-Worked example at the Executing state:
+Body template — fill the placeholders, change nothing else:
 
 ```
 🤖 **Web app test in progress**
 
-▶️ **25/52 cases** · ✅ 25 · ❌ 0 · ⚪ 0
+<STATE LINE>
 
-**Plan:** `test-cases.csv` (52 active cases)
-**Target:** https://test-runner-git-feature-product-tags-….vercel.app
-**Workspace:** re-pointed to the PR head (`42d1dd7`)
+**Plan:** `<sheet>` (<n> active cases)
+**Target:** <url>
+<optional: **Workspace:** re-pointed to the PR head (`<short sha>`)>
 
-_Updated 18:42:11 UTC._
+_Updated <ISO 8601 UTC>._
 ```
+
+`<STATE LINE>` is exactly one of:
+
+| State | Line |
+|---|---|
+| Starting | `⏳ Starting — installing Playwright and launching a browser.` |
+| Resolving | `⚙️ Resolving the test plan…` |
+| Ready | `📋 Ready — executing <n> cases.` |
+| Executing | `▶️ **<k>/<n> cases** · ✅ <p> passed · ❌ <f> failed · ⚪ <b> blocked` |
+| Reporting | `📝 Composing the report…` |
+| Done | `✅ Complete — <p>/<n> passed. See the report below.` |
+
+**Rules for the Executing line, which repeats:**
+
+- Keep the field order `passed · failed · blocked` every time. Do not reorder.
+- Emit counts only — no parentheticals, no commentary, no "effective" or "auto-corrected" notes. Those belong in the final report, not a status line.
+- Counts must be monotonic: `<k>`, `<p>`, `<f>`, `<b>` never decrease between updates. A number going backwards means the tally is being recomputed rather than accumulated — recount from the log before posting.
+- Keep `_Updated …_` as the last line in every state; it is how a stalled run is spotted.
 
 The final report is a **separate** comment — the status comment is left at **Done** rather than being overwritten with it, so the run's trace and its result both remain readable.
 
@@ -152,7 +159,17 @@ find_comment() {  # $1 = unique prefix, e.g. "🤖 **Test plan resolved**"
 }
 ```
 
-If it returns an id, PATCH that comment; if it returns nothing, post a new one. This holds for the status comment, the test-plan comment, and the proposed-cases comment alike — a duplicated dispatch must not produce a duplicated thread.
+If it returns an id, PATCH that comment; if it returns nothing, post a new one.
+
+The prefixes are fixed — use these exact strings, and never let a body's first line drift from them:
+
+| Comment | Prefix |
+|---|---|
+| Status (all states) | `🤖 **Web app test in progress**` |
+| Test plan resolved | `🤖 **Test plan resolved**` |
+| Proposed cases | `🤖 **New feature detected` |
+
+A body whose first line no longer matches its prefix is unfindable, and the next update posts a duplicate instead of editing. That is the single most common cause of a thread filling with near-identical comments.
 
 If any edit fails, log one warning and continue. Status reporting never aborts a run.
 

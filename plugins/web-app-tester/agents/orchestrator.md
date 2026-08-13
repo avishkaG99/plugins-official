@@ -216,7 +216,9 @@ STATUS_ID=$(gh api "repos/${REPO}/issues/${ENTRY_ID}/comments" \
 
 If `STATUS_ID` is non-empty, **do not post another comment** — adopt that id as the run's status comment and continue. Only post a new one when the query returns nothing.
 
-**This comment is the run's status display.** Keep its id as `STATUS_ID` and PATCH it at each state change — Resolving, Ready, Executing (every 5 cases), Reporting, Done — per `providers/github.md` "Progress Comments". Editing one comment keeps the thread readable; never post a second status comment.
+**This comment is the run's status display.** Keep its id as `STATUS_ID` and PATCH it at each state change — Resolving, Ready, Executing (every 5 cases), Reporting, Done — per `providers/github.md` "Progress Comments".
+
+**Never change its first line.** The heading `🤖 **Web app test in progress**` stays byte-identical across every state; the state goes on the second line. That heading is how the comment is found again, so editing it strands the comment and the next update posts a duplicate. Never post a second status comment.
 
 The final report and any proposed-cases comment are **separate** posts, not edits of this one.
 
