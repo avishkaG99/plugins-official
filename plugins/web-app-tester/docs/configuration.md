@@ -56,7 +56,15 @@ Vercel, Netlify, and Cloudflare Pages all post the preview URL on the PR as soon
 }
 ```
 
-This matters because a host may publish **two** URLs for one deployment — a per-deployment hash (`myapp-8j2h61llk-myteam.vercel.app`) and a branch alias (`myapp-git-mybranch-myteam.vercel.app`). Only the branch alias is derivable from the branch name; the hash is not. Scraping picks up whichever the bot posted, so neither form has to be guessed.
+This matters because a host may publish **two** URLs for one deployment — a per-deployment hash (`myapp-8j2h61llk-myteam.vercel.app`) and a branch alias (`myapp-git-mybranch-myteam.vercel.app`). Only the branch alias is derivable from the branch name; the hash is not. The alias is also the one worth having: it always resolves to that branch's newest deployment, whereas a hash URL pins a single build and goes stale on the next push.
+
+Vercel's comment carries both a hidden structured payload and a visible table. The payload is parsed first:
+
+```
+[vc]: #<hash>:<base64-json>
+```
+
+which decodes to `{"projects":[{"name":"myapp","previewUrl":"myapp-git-my-branch-team.vercel.app","nextCommitStatus":"DEPLOYED"}]}`. Reading `previewUrl` from there avoids regexing markdown and handles monorepos, where one comment lists several projects. Only projects reporting `DEPLOYED` are used — a build still running would 404.
 
 `baseUrl` stays as the fallback for when no bot comment exists (a manual run, or a deployment that has not finished yet).
 

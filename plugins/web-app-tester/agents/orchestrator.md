@@ -97,13 +97,30 @@ If present, read it (schema in `docs/configuration.md`) and resolve:
    4. Otherwise → no candidate URL; Phase 1 falls back to comment-scraping (`TEST_URL_SOURCE=scraped`)
 1a. **Deployment-bot comment scraping (preferred for preview environments)** — when the environment sets `previewFromComment: true`, resolve the URL from the deployment bot's own PR comment **before** trying `baseUrl`. This is the most reliable source: the bot posts the exact URL it deployed, so it survives branch renames, per-deployment hash hostnames (`myapp-8j2h61llk-team.vercel.app`), and any naming scheme the host changes underneath you.
 
-   Scan the PR comments (already fetched in Phase 1) for a deployment bot's preview URL, newest comment first:
+   Scan the PR comments (already fetched in Phase 1) for a deployment bot's preview URL, newest comment first.
 
-   - **Vercel** (`vercel[bot]`) — the "Preview" row of its deployments table; also `Visit Preview`, `Inspect`.
+   **Vercel (`vercel[bot]`) — parse the structured payload, not the table.** Every Vercel comment begins with a hidden marker line carrying base64-encoded JSON:
+
+   ```
+   [vc]: #<hash>:<base64-json>
+   ```
+
+   Decode it and read `projects[].previewUrl` — this is exact, unambiguous, and handles monorepos (one entry per project). Decode with:
+
+   ```bash
+   printf '%s' "<base64-json>" | base64 -d 2>/dev/null
+   ```
+
+   The payload shape is `{"projects":[{"name":"...","previewUrl":"myapp-git-my-branch-team.vercel.app","inspectorUrl":"...","nextCommitStatus":"DEPLOYED"}]}`. `previewUrl` has **no scheme** — prefix `https://`. When several projects are listed, pick the one whose `name` or `rootDirectory` matches the app under test; if only one is listed, use it.
+
+   Only use a project whose `nextCommitStatus` is `DEPLOYED` — a build still in progress will 404.
+
+   If the marker cannot be decoded, fall back to the visible markdown table: the `Preview` column's `Visit Preview` link.
+
    - **Netlify** (`netlify[bot]`) — "Deploy Preview ready", `deploy-preview-<n>--<site>.netlify.app`.
    - **Cloudflare Pages** (`cloudflare-workers-and-pages[bot]`) — the branch preview URL.
 
-   Take the **most recent** matching comment — later deployments supersede earlier ones. Prefer a stable branch alias (containing `-git-`) over a per-deployment hash URL when the comment offers both, since the alias always points at the newest deployment for that branch.
+   Take the **most recent** matching comment — later deployments supersede earlier ones. Prefer a stable branch alias (containing `-git-`) over a per-deployment hash URL when the comment offers both: the alias always resolves to that branch's newest deployment, while a hash URL pins one build and goes stale on the next push.
 
    If no bot comment is found, fall through to `baseUrl` (with `{branch}` substitution below), then `fallbackUrl`.
 
