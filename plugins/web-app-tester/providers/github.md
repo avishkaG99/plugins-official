@@ -136,7 +136,6 @@ _Updated <ISO 8601 UTC>._
 | Resolving | `⚙️ Resolving the test plan…` |
 | Found | `📋 Found **<n> test cases** in \`<sheet>\`.` |
 | Checking | `🔍 Found **<n> test cases** in \`<sheet>\` — checking for missing coverage…` |
-| Gap found | `⚠️ Found **<n> test cases**, and **<k> more** this PR needs — awaiting your answer below.` |
 | No gap | `✅ Found **<n> test cases** — coverage is complete. Executing now.` |
 | Executing | `▶️ **<k>/<n> cases** · ✅ <p> passed · ❌ <f> failed · ⚪ <b> blocked · ~<mm:ss> left` |
 | Reporting | `📝 Composing the report…` |
@@ -144,6 +143,10 @@ _Updated <ISO 8601 UTC>._
 | Declined | `▶️ Proposal declined — executing the existing <n> cases.` |
 | Done | `✅ Complete — <p>/<n> passed. See the report below.` |
 | Failed | `💥 Run failed — <one-line reason>. <k>/<n> cases had completed.` |
+
+**A state is set once, when it becomes true.** Do not pass through two states that say the same thing — the reader sees the comment change twice seconds apart and reads it as a glitch rather than progress. If a state's line would duplicate the one before it, skip it.
+
+**Post comments in the order they describe.** The thread reads top to bottom, so a comment that arrives late reads as having happened late. `Test plan resolved` is posted when the sheet is parsed — before the coverage check, and therefore before the status ever mentions a gap. If the check later finds one, **edit** that comment to append the warning; never post it a second time.
 
 **Always reach a terminal state.** Every run ends at `Done`, `Awaiting`, `Declined`, or `Failed` — never mid-sequence. If a phase raises an unrecoverable error, set `Failed` with the reason and the count reached before exiting. A status frozen at `Executing 23/52` is indistinguishable from a hung run, and the reader has no way to know the run is over.
 

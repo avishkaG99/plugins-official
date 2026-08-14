@@ -286,23 +286,27 @@ It produces the variables `TEST_URL`, `IS_PRODUCTION`, `MUTATIONS_ALLOWED`, `TES
 
 **Run this after Phase 1 resolves the sheet and before Phase 2 opens a browser.** The point is that the suite which runs already covers the PR. Testing 52 cases and only then mentioning that 3 are missing gets the order backwards — the reader learns about the gap when it is too late for the run to include it.
 
-1. **Announce the count.** Set the status comment to `Found` — `📋 Found **<n> test cases** in \`<sheet>\`.`
+**Comments must appear in the order they describe.** The thread is read top to bottom, so a comment posted late reads as if it happened late. Post `🤖 **Test plan resolved**` the moment the sheet is parsed — before the coverage check runs, and therefore before the status ever mentions a gap. A plan comment arriving after "awaiting your answer" tells the reader the plan was resolved after the pause, which is false.
+
+1. **Post the plan comment, then announce the count.** Post `🤖 **Test plan resolved**` (body in `providers/github.md`) naming the sheet, the active-case count, the target URL, and any workspace correction. Then set the status comment to `Found` — `📋 Found **<n> test cases** in \`<sheet>\`.`
+
+   At this point the gap is not yet known, so the plan comment carries **no** ⚠️ warning. It is added by editing that same comment in step 4, once the check has run.
 
 2. **Check for gaps.** Set the status to `Checking`, then run the coverage analysis from `skills/post-test-report/SKILL.md` §2f against `CHANGED_FILES`. This is a file-and-sheet comparison; no browser is needed.
 
 3. **No gap** → set the status to `No gap` and continue to Phase 2 with the existing cases. Nothing to ask.
 
-4. **Gap found** → set the status to `Gap found`, post the `🤖 **New feature detected` comment with the proposed rows and Yes/No checkboxes as its own comment, and **stop there**. Do not execute a single case yet.
+4. **Gap found** → in this order:
 
-   The status line names what is pending, so the run does not look hung:
+   a. **Edit the plan comment** to append the warning — `⚠️ This PR appears to add **<feature>**, which none of the <n> cases cover.` It is the same comment, edited in place; never post a second one.
 
-   ```
-   ⚠️ Found **52 test cases**, and **3 more** this PR needs — awaiting your answer below.
-   ```
+   b. **Post** the `🤖 **New feature detected` comment with the proposed rows and Yes/No checkboxes, as its own comment.
 
-   Set the status comment to `Awaiting` — `⏸️ Paused — <k> proposed cases awaiting your answer. Nothing has been tested yet.` — before exiting. A run that stops without a terminal state looks identical to one that crashed; the reader must be able to tell "waiting for me" from "died".
+   c. **Set the status to `Awaiting`** — `⏸️ Paused — <k> proposed cases awaiting your answer. Nothing has been tested yet.` This is the run's terminal state; a run that stops without one looks identical to a crash.
 
-   End the run cleanly at this point. Nothing further happens until the author responds.
+   **Use `Awaiting` only — there is no separate `Gap found` state.** Passing through two states that both say "awaiting your answer" makes the comment flicker between near-identical wordings seconds apart, which reads as a glitch. One state, set once, when the pause is real.
+
+   **Do not execute a single case.** End the run cleanly here; nothing further happens until the author responds.
 
 5. **On the next trigger** — the approval label, or a re-run after a box is ticked — read the answer per `skills/apply-proposed-cases/SKILL.md`:
 
